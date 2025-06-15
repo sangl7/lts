@@ -30,38 +30,59 @@ const posMap = {
   '올포지션': ['top', 'jungle', 'mid', 'adc', 'support'],
 };
 
-// Hardcoded player data
+// Helper to normalize a position to English code
+function normalizePosition(pos) {
+  if (!pos) return '';
+  if (typeof pos !== 'string') return pos;
+  const lower = pos.trim().toLowerCase();
+  if (lower === 'adc') return 'adc';
+  // Map Korean and other variants
+  if (posMap[pos]) return Array.isArray(posMap[pos]) ? posMap[pos][0] : posMap[pos];
+  // Try to match by lowercased English
+  if (['top', 'jungle', 'mid', 'adc', 'support'].includes(lower)) return lower;
+  return pos;
+}
+
+// Normalize all preferredPositions in initialPlayers
 const initialPlayers = [
-  { name: '김태우', tier: 'silver', preferredPositions: ['top', 'adc', 'jungle'] },
-  { name: '임대원', tier: 'diamond', preferredPositions: ['support', 'adc', 'jungle', 'top', 'mid'] },
-  { name: '이상훈', tier: 'silver', preferredPositions: ['adc', 'top'] },
-  { name: '김동현', tier: 'bronze', preferredPositions: ['top', 'support'] },
-  { name: '황희승', tier: 'emerald', preferredPositions: ['mid', 'support', 'adc', 'jungle'] },
-  { name: '이찬준', tier: 'gold', preferredPositions: ['jungle', 'mid', 'adc'] },
-  { name: '정준영', tier: 'platinum', preferredPositions: ['jungle', 'top', 'support', 'adc', 'mid'] },
-  { name: '박동선', tier: 'gold', preferredPositions: ['jungle', 'mid', 'adc'] },
-  { name: '강정훈', tier: 'bronze', preferredPositions: ['support', 'top', 'mid'] },
-  { name: '구교준', tier: 'bronze', preferredPositions: ['top', 'mid', 'support', 'adc', 'jungle'] },
-  { name: '김병호', tier: 'silver', preferredPositions: ['jungle', 'top', 'adc'] },
-  { name: '이규빈', tier: 'silver', preferredPositions: ['support', 'adc', 'top', 'jungle', 'mid'] },
-  { name: '이종혁', tier: 'bronze', preferredPositions: ['jungle'] },
-  { name: '박진현', tier: 'silver', preferredPositions: ['support', 'adc', 'top'] },
-  { name: '스펜서', tier: 'silver', preferredPositions: ['top', 'mid', 'support', 'adc'] },
-  { name: '구본근', tier: 'diamond', preferredPositions: ['top', 'jungle', 'mid', 'adc', 'support'] }, // 올포지션
-  { name: '권예창', tier: 'gold', preferredPositions: ['jungle', 'support'] },
-  { name: '조관중', tier: 'bronze', preferredPositions: ['top', 'support', 'mid', 'jungle', 'adc'] },
-  { name: '심재원', tier: 'silver', preferredPositions: ['top'] },
-  { name: '박성현', tier: 'diamond', preferredPositions: ['mid', 'top', 'jungle', 'support', 'adc'] },
-  { name: '정의건', tier: 'bronze', preferredPositions: ['support', 'top'] },
-  { name: '정한용', tier: 'master+', preferredPositions: ['jungle', 'adc', 'top', 'mid', 'support'] },
-  { name: '이한슬', tier: 'master+', preferredPositions: ['mid', 'adc'] },
-  { name: '정호원', tier: 'gold', preferredPositions: ['top', 'support', 'mid'] },
-  { name: '김재현', tier: 'diamond', preferredPositions: ['mid', 'jungle', 'top'] },
-  { name: '강민', tier: 'diamond', preferredPositions: ['support', 'adc', 'top', 'jungle', 'mid'] },
-  { name: '추지웅', tier: 'bronze', preferredPositions: ['adc', 'mid', 'top', 'jungle', 'support'] },
-  { name: '문호빈', tier: 'bronze', preferredPositions: ['support', 'jungle', 'top'] },
-  { name: '윤수열', tier: 'iron', preferredPositions: ['support', 'top'] },
-].map((p, i) => ({ ...p, id: 1000 + i, timestamp: new Date().toISOString() }));
+  { name: '김태우', tier: 'silver', preferredPositions: ['탑', '원딜', '정글'] },
+  { name: '임대원', tier: 'diamond', preferredPositions: ['서폿', '원딜', '정글', '탑', '미드'] },
+  { name: '이상훈', tier: 'silver', preferredPositions: ['원딜', '탑'] },
+  { name: '김동현', tier: 'bronze', preferredPositions: ['탑', '서폿'] },
+  { name: '황희승', tier: 'emerald', preferredPositions: ['미드', '서폿', '원딜', '정글'] },
+  { name: '이찬준', tier: 'gold', preferredPositions: ['정글', '미드', '원딜'] },
+  { name: '정준영', tier: 'platinum', preferredPositions: ['정글', '탑', '서폿', '원딜', '미드'] },
+  { name: '박동선', tier: 'gold', preferredPositions: ['정글', '미드', '원딜'] },
+  { name: '강정훈', tier: 'bronze', preferredPositions: ['서폿', '탑', '미드'] },
+  { name: '구교준', tier: 'bronze', preferredPositions: ['탑', '미드', '서폿', '원딜', '정글'] },
+  { name: '김병호', tier: 'silver', preferredPositions: ['정글', '탑', '원딜'] },
+  { name: '이규빈', tier: 'silver', preferredPositions: ['서폿', '원딜', '탑', '정글', '미드'] },
+  { name: '이종혁', tier: 'bronze', preferredPositions: ['정글'] },
+  { name: '박진현', tier: 'silver', preferredPositions: ['서폿', '원딜', '탑'] },
+  { name: '스펜서', tier: 'silver', preferredPositions: ['탑', '미드', '서폿', 'Adc'] },
+  { name: '구본근', tier: 'diamond', preferredPositions: ['올포지션'] }, // 올포지션
+  { name: '권예창', tier: 'gold', preferredPositions: ['정글', '서폿'] },
+  { name: '조관중', tier: 'bronze', preferredPositions: ['탑', '서폿', '미드', '정글', '원딜'] },
+  { name: '심재원', tier: 'silver', preferredPositions: ['탑'] },
+  { name: '박성현', tier: 'diamond', preferredPositions: ['미드', '탑', '정글', '서폿', 'adc'] },
+  { name: '정의건', tier: 'bronze', preferredPositions: ['서폿', '탑'] },
+  { name: '정한용', tier: 'master+', preferredPositions: ['정글', '원딜', '탑', '미드', '서폿'] },
+  { name: '이한슬', tier: 'master+', preferredPositions: ['미드', '원딜'] },
+  { name: '정호원', tier: 'gold', preferredPositions: ['탑', '서폿', '미드'] },
+  { name: '김재현', tier: 'diamond', preferredPositions: ['미드', '정글', '탑'] },
+  { name: '강민', tier: 'diamond', preferredPositions: ['서폿', '원딜', '탑', '정글', '미드'] },
+  { name: '추지웅', tier: 'bronze', preferredPositions: ['원딜', '미드', '탑', '정글', '서폿'] },
+  { name: '문호빈', tier: 'bronze', preferredPositions: ['서폿', '정글', '탑'] },
+  { name: '윤수열', tier: 'iron', preferredPositions: ['서폿', '탑'] },
+].map((p, i) => ({
+  ...p,
+  preferredPositions: p.preferredPositions.flatMap(pos => {
+    if (Array.isArray(posMap[pos])) return posMap[pos];
+    return [normalizePosition(pos)];
+  }),
+  id: 1000 + i,
+  timestamp: new Date().toISOString(),
+}));
 
 function App() {
   // Use hardcoded players as initial state
