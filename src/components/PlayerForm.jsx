@@ -3,6 +3,7 @@ import { UserPlus } from 'lucide-react';
 
 const TIERS = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond', 'master+'];
 const POSITIONS = ['top', 'jungle', 'mid', 'adc', 'support'];
+const NONE = 'none';
 
 function PlayerForm({ onAddPlayer, showAdvanced }) {
   const [formData, setFormData] = useState({
@@ -16,11 +17,14 @@ function PlayerForm({ onAddPlayer, showAdvanced }) {
   const handlePositionPreferenceChange = (index, value) => {
     setFormData(prev => {
       const newPrefs = [...prev.preferredPositions];
-      const currentValue = newPrefs[index];
+      if (value === NONE) {
+        newPrefs[index] = NONE;
+        return { ...prev, preferredPositions: newPrefs };
+      }
       const swapIndex = newPrefs.findIndex((pos, i) => pos === value && i !== index);
       if (swapIndex !== -1) {
         // Swap the values
-        newPrefs[swapIndex] = currentValue;
+        newPrefs[swapIndex] = newPrefs[index];
       }
       newPrefs[index] = value;
       return { ...prev, preferredPositions: newPrefs };
@@ -33,13 +37,21 @@ function PlayerForm({ onAddPlayer, showAdvanced }) {
       alert('Please enter a player name');
       return;
     }
-    if (new Set(formData.preferredPositions).size !== 5) {
-      alert('Please select a unique position for each preference.');
+    // Only check for unique non-NONE positions
+    const filtered = formData.preferredPositions.filter(pos => pos !== NONE);
+    if (new Set(filtered).size !== filtered.length) {
+      alert('Please select a unique position for each preference (except None).');
       return;
+    }
+    // Remove trailing 'none' values for preferredPositions
+    let trimmedPrefs = [...formData.preferredPositions];
+    while (trimmedPrefs.length > 1 && trimmedPrefs[trimmedPrefs.length - 1] === NONE) {
+      trimmedPrefs.pop();
     }
     onAddPlayer({
       ...formData,
       name: formData.name.trim(),
+      preferredPositions: trimmedPrefs,
     });
     // Reset form
     setFormData({
@@ -133,6 +145,8 @@ function PlayerForm({ onAddPlayer, showAdvanced }) {
                 onChange={e => handlePositionPreferenceChange(idx, e.target.value)}
                 className="w-full bg-gray-700 text-white rounded-md px-2 py-2 focus:ring-2 focus:ring-lol-gold focus:outline-none"
               >
+                {/* Always allow 'none' for idx >= 1 */}
+                {idx > 0 && <option value={NONE}>None</option>}
                 {POSITIONS.map(option => (
                   <option
                     key={option}

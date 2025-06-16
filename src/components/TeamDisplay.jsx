@@ -141,7 +141,6 @@ function TeamDisplay({ teams }) {
                       <th className="py-2 pr-4">Position</th>
                       <th className="py-2 pr-4">Player</th>
                       <th className="py-2 pr-4">Tier for Position</th>
-                      <th className="py-2 pr-4">Preferred?</th>
                       <th className="py-2 pr-4">Pref. Score</th>
                     </tr>
                   </thead>
@@ -157,8 +156,6 @@ function TeamDisplay({ teams }) {
                         );
                       }
                       const tierForPosition = player.advancedTiers && player.advancedTiers[pos] ? player.advancedTiers[pos] : player.tier;
-                      const isPreferred = (player.preferredPositions || []).indexOf(pos) >= 0;
-                      const isTopPreference = (player.preferredPositions || []).indexOf(pos) <= 1; // 0 or 1 (first or second)
                       const prefScore = getPreferenceScore(player, pos);
                       return (
                         <tr key={player.id} className="border-b border-gray-600">
@@ -170,13 +167,6 @@ function TeamDisplay({ teams }) {
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTierBadgeColor(tierForPosition)}`}>
                               {tierForPosition.charAt(0).toUpperCase() + tierForPosition.slice(1)}
                             </span>
-                          </td>
-                          <td className="py-2 pr-4">
-                            {isPreferred && (
-                              <span className="inline-flex items-center">
-                                {isTopPreference && <Star size={16} className="text-yellow-400 mr-1" />}<span className="text-gray-300">{isTopPreference ? 'Top' : 'Yes'}</span>
-                              </span>
-                            )}
                           </td>
                           <td className="py-2 pr-4 font-bold text-lol-gold">{prefScore}</td>
                         </tr>
@@ -195,10 +185,6 @@ function TeamDisplay({ teams }) {
         <h4 className="text-lg font-semibold text-lol-gold mb-3">Legend</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
-            <div className="flex items-center space-x-2 mb-2">
-              <Star size={16} className="text-yellow-400" />
-              <span className="text-gray-300">Player assigned to one of their top 2 preferences</span>
-            </div>
             <div className="text-gray-400">
               The algorithm prioritizes fairness first, then position preferences.
             </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Trash2, User } from 'lucide-react';
 
-function PlayerList({ players, onRemovePlayer }) {
+function PlayerList({ players, onRemovePlayer, onEditPlayer }) {
   const getTierColor = (tier) => {
     const colors = {
       iron: 'text-gray-400 bg-gray-800',
@@ -79,14 +79,23 @@ function PlayerList({ players, onRemovePlayer }) {
               </div>
             </div>
           </div>
-
-          <button
-            onClick={() => onRemovePlayer(player.id)}
-            className="flex-shrink-0 p-2 text-red-400 hover:text-red-300 hover:bg-red-900 rounded-md transition-colors"
-            title="Remove player"
-          >
-            <Trash2 size={18} />
-          </button>
+          {/* Button group aligned right */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => onEditPlayer(player)}
+              className="flex-shrink-0 p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900 rounded-md transition-colors"
+              title="Edit player"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => onRemovePlayer(player.id)}
+              className="flex-shrink-0 p-2 text-red-400 hover:text-red-300 hover:bg-red-900 rounded-md transition-colors"
+              title="Remove player"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
         </div>
       ))}
     </div>

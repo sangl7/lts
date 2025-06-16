@@ -5,6 +5,11 @@ import PlayerList from './components/PlayerList';
 import TeamDisplay from './components/TeamDisplay';
 import { distributeTeams, validateTeamDistribution } from './utils/teamDistribution';
 import { savePlayers, loadPlayers, clearPlayers } from './utils/storage';
+import AuthPage from './AuthPage';
+import { signOut } from 'firebase/auth';
+import { auth } from './firebase';
+import { getPlayers, addPlayer, updatePlayer, deletePlayer, saveFinalizedTeams, getFinalizedTeams, resetFinalizedTeams } from './utils/firestore';
+import { initialPlayers } from './initialPlayers';
 
 // Mapping for Korean to English tiers and positions
 const tierMap = {
@@ -43,101 +48,186 @@ function normalizePosition(pos) {
   return pos;
 }
 
-// Normalize all preferredPositions in initialPlayers
-const initialPlayers = [
-  { name: '김태우', tier: 'silver', preferredPositions: ['탑', '원딜', '정글'] },
-  { name: '임대원', tier: 'diamond', preferredPositions: ['서폿', '원딜', '정글', '탑', '미드'] },
-  { name: '이상훈', tier: 'silver', preferredPositions: ['원딜', '탑'] },
-  { name: '김동현', tier: 'bronze', preferredPositions: ['탑', '서폿'] },
-  { name: '황희승', tier: 'emerald', preferredPositions: ['미드', '서폿', '원딜', '정글'] },
-  { name: '이찬준', tier: 'gold', preferredPositions: ['정글', '미드', '원딜'] },
-  { name: '정준영', tier: 'platinum', preferredPositions: ['정글', '탑', '서폿', '원딜', '미드'] },
-  { name: '박동선', tier: 'gold', preferredPositions: ['정글', '미드', '원딜'] },
-  { name: '강정훈', tier: 'bronze', preferredPositions: ['서폿', '탑', '미드'] },
-  { name: '구교준', tier: 'bronze', preferredPositions: ['탑', '미드', '서폿', '원딜', '정글'] },
-  { name: '김병호', tier: 'silver', preferredPositions: ['정글', '탑', '원딜'] },
-  { name: '이규빈', tier: 'silver', preferredPositions: ['서폿', '원딜', '탑', '정글', '미드'] },
-  { name: '이종혁', tier: 'bronze', preferredPositions: ['정글'] },
-  { name: '박진현', tier: 'silver', preferredPositions: ['서폿', '원딜', '탑'] },
-  { name: '스펜서', tier: 'silver', preferredPositions: ['탑', '미드', '서폿', 'Adc'] },
-  { name: '구본근', tier: 'diamond', preferredPositions: ['올포지션'] }, // 올포지션
-  { name: '권예창', tier: 'gold', preferredPositions: ['정글', '서폿'] },
-  { name: '조관중', tier: 'bronze', preferredPositions: ['탑', '서폿', '미드', '정글', '원딜'] },
-  { name: '심재원', tier: 'silver', preferredPositions: ['탑'] },
-  { name: '박성현', tier: 'diamond', preferredPositions: ['미드', '탑', '정글', '서폿', 'adc'] },
-  { name: '정의건', tier: 'bronze', preferredPositions: ['서폿', '탑'] },
-  { name: '정한용', tier: 'master+', preferredPositions: ['정글', '원딜', '탑', '미드', '서폿'] },
-  { name: '이한슬', tier: 'master+', preferredPositions: ['미드', '원딜'] },
-  { name: '정호원', tier: 'gold', preferredPositions: ['탑', '서폿', '미드'] },
-  { name: '김재현', tier: 'diamond', preferredPositions: ['미드', '정글', '탑'] },
-  { name: '강민', tier: 'diamond', preferredPositions: ['서폿', '원딜', '탑', '정글', '미드'] },
-  { name: '추지웅', tier: 'bronze', preferredPositions: ['원딜', '미드', '탑', '정글', '서폿'] },
-  { name: '문호빈', tier: 'bronze', preferredPositions: ['서폿', '정글', '탑'] },
-  { name: '윤수열', tier: 'iron', preferredPositions: ['서폿', '탑'] },
-].map((p, i) => ({
-  ...p,
-  preferredPositions: p.preferredPositions.flatMap(pos => {
-    if (Array.isArray(posMap[pos])) return posMap[pos];
-    return [normalizePosition(pos)];
-  }),
-  id: 1000 + i,
-  timestamp: new Date().toISOString(),
-}));
+function EditPlayerModal({ player, onSave, onClose }) {
+  const [form, setForm] = useState({
+    preferredPositions: player.preferredPositions || [],
+    advancedTiers: player.advancedTiers || {},
+    tier: player.tier || '',
+  });
+
+  const handleChange = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePositionChange = (idx, value) => {
+    const newPositions = [...form.preferredPositions];
+    newPositions[idx] = value;
+    setForm(prev => ({ ...prev, preferredPositions: newPositions }));
+  };
+
+  const handleAdvancedTierChange = (position, value) => {
+    setForm(prev => ({
+      ...prev,
+      advancedTiers: { ...prev.advancedTiers, [position]: value },
+    }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({ ...player, ...form });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded shadow-xl w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4 text-lol-gold">Edit Player: {player.name}</h2>
+        <div className="mb-4">
+          <label className="block text-gray-300 mb-2">Preferred Positions</label>
+          {form.preferredPositions.map((pos, idx) => (
+            <select
+              key={idx}
+              value={pos}
+              onChange={e => handlePositionChange(idx, e.target.value)}
+              className="w-full mb-2 bg-gray-700 text-white rounded px-2 py-1"
+            >
+              {['top', 'jungle', 'mid', 'adc', 'support'].map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          ))}
+        </div>
+        <div className="mb-4">
+          <label className="block text-gray-300 mb-2">Main Tier</label>
+          <select
+            value={form.tier}
+            onChange={e => handleChange('tier', e.target.value)}
+            className="w-full bg-gray-700 text-white rounded px-2 py-1"
+          >
+            {['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond', 'master+'].map(tier => (
+              <option key={tier} value={tier}>{tier}</option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-4">
+          <label className="block text-gray-300 mb-2">Advanced Tiers (optional)</label>
+          {['top', 'jungle', 'mid', 'adc', 'support'].map(position => (
+            <div key={position} className="mb-2">
+              <span className="text-gray-400 mr-2">{position}</span>
+              <select
+                value={form.advancedTiers[position] || ''}
+                onChange={e => handleAdvancedTierChange(position, e.target.value)}
+                className="bg-gray-700 text-white rounded px-2 py-1"
+              >
+                <option value="">Use main tier</option>
+                {['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond', 'master+'].map(tier => (
+                  <option key={tier} value={tier}>{tier}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end space-x-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-600 text-white rounded">Cancel</button>
+          <button type="submit" className="px-4 py-2 bg-lol-gold text-lol-blue rounded font-bold">Save</button>
+        </div>
+      </form>
+    </div>
+  );
+}
 
 function App() {
-  // Use hardcoded players as initial state
-  const [players, setPlayers] = useState(() => {
-    // If localStorage has players, use them; otherwise, use initialPlayers
-    const savedPlayers = loadPlayers();
-    return savedPlayers.length > 0 ? savedPlayers : initialPlayers;
-  });
+  const [user, setUser] = useState(null);
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editPlayer, setEditPlayer] = useState(null);
   const [teams, setTeams] = useState([]);
   const [teamsCount, setTeamsCount] = useState(2);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState('players');
+  const [finalized, setFinalized] = useState(null);
+  const [finalizedLoading, setFinalizedLoading] = useState(true);
 
-  // Save players to localStorage whenever players change
   useEffect(() => {
-    savePlayers(players);
-  }, [players]);
+    if (user) {
+      setLoading(true);
+      getPlayers().then(players => {
+        setPlayers(players);
+        setLoading(false);
+      });
+      setFinalizedLoading(true);
+      getFinalizedTeams().then(data => {
+        setFinalized(data && data.teams && data.teams.length > 0 ? data : null);
+        setFinalizedLoading(false);
+      });
+    }
+  }, [user]);
 
-  const addPlayer = (player) => {
-    const newPlayer = {
-      ...player,
-      id: Date.now() + Math.random(),
-      timestamp: new Date().toISOString()
-    };
-    setPlayers(prev => [...prev, newPlayer]);
+  const handleAddPlayer = async (player) => {
+    await addPlayer(player);
+    const updated = await getPlayers();
+    setPlayers(updated);
   };
 
-  const removePlayer = (playerId) => {
-    setPlayers(prev => prev.filter(p => p.id !== playerId));
+  const handleRemovePlayer = async (playerId) => {
+    await deletePlayer(playerId);
+    const updated = await getPlayers();
+    setPlayers(updated);
   };
 
-  const clearAllPlayers = () => {
+  const handleEditPlayer = (player) => {
+    setEditPlayer(player);
+  };
+
+  const handleSaveEdit = async (updatedPlayer) => {
+    await updatePlayer(updatedPlayer.id, updatedPlayer);
+    setEditPlayer(null);
+    const updated = await getPlayers();
+    setPlayers(updated);
+  };
+
+  const clearAllPlayers = async () => {
+    for (const player of players) {
+      await deletePlayer(player.id);
+    }
     setPlayers([]);
-    clearPlayers();
     setTeams([]);
   };
 
   const generateTeams = () => {
     const validation = validateTeamDistribution(players, teamsCount);
-    
     if (!validation.valid) {
       alert(validation.message);
       return;
     }
-
     const distributedTeams = distributeTeams(players, teamsCount);
     setTeams(distributedTeams);
     setActiveTab('teams');
   };
 
+  const handleFinalizeTeams = async () => {
+    await saveFinalizedTeams(teams, user);
+    setFinalized({ teams, finalizedAt: new Date().toISOString(), finalizedBy: user?.email });
+  };
+
+  const handleResetFinalized = async () => {
+    await resetFinalizedTeams();
+    setFinalized(null);
+    setTeams([]);
+    setActiveTab('players');
+  };
+
   const maxTeams = Math.floor(players.length / 5);
+
+  if (!user) {
+    return <AuthPage onAuth={setUser} />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-lol-blue via-gray-900 to-lol-blue text-lol-light">
       <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-end mb-4">
+          <button onClick={() => signOut(auth)} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Sign Out</button>
+        </div>
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-lol-gold mb-2">
@@ -147,7 +237,6 @@ function App() {
             Create fair and balanced teams for your League games
           </p>
         </div>
-
         {/* Navigation */}
         <div className="flex justify-center mb-8">
           <div className="bg-gray-800 rounded-lg p-1 flex space-x-1">
@@ -159,7 +248,6 @@ function App() {
                   : 'text-gray-300 hover:text-white'
               }`}
             >
-              <Users size={20} />
               <span>Players ({players.length})</span>
             </button>
             <button
@@ -170,8 +258,7 @@ function App() {
                   : 'text-gray-300 hover:text-white'
               }`}
             >
-              <Trophy size={20} />
-              <span>Teams ({teams.length})</span>
+              <span>Teams ({finalized ? (finalized.teams ? finalized.teams.length : 0) : teams.length})</span>
             </button>
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
@@ -181,29 +268,24 @@ function App() {
                   : 'text-gray-300 hover:text-white'
               }`}
             >
-              <Settings size={20} />
               <span>Advanced</span>
             </button>
           </div>
         </div>
-
         {/* Players Tab */}
         {activeTab === 'players' && (
           <div className="space-y-8">
             {/* Add Player Form */}
             <div className="bg-gray-800 rounded-lg p-6 shadow-xl">
               <h2 className="text-2xl font-semibold text-lol-gold mb-4 flex items-center">
-                <Plus className="mr-2" size={24} />
                 Add Player
               </h2>
-              <PlayerForm onAddPlayer={addPlayer} showAdvanced={showAdvanced} />
+              <PlayerForm onAddPlayer={handleAddPlayer} showAdvanced={showAdvanced} />
             </div>
-
             {/* Player List */}
             <div className="bg-gray-800 rounded-lg p-6 shadow-xl">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-semibold text-lol-gold flex items-center">
-                  <Users className="mr-2" size={24} />
                   Players ({players.length}/30)
                 </h2>
                 {players.length > 0 && (
@@ -211,19 +293,20 @@ function App() {
                     onClick={clearAllPlayers}
                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md flex items-center space-x-2 transition-colors"
                   >
-                    <Trash2 size={16} />
                     <span>Clear All</span>
                   </button>
                 )}
               </div>
-              <PlayerList players={players} onRemovePlayer={removePlayer} />
+              {loading ? (
+                <div className="text-gray-400">Loading players...</div>
+              ) : (
+                <PlayerList players={players} onRemovePlayer={handleRemovePlayer} onEditPlayer={handleEditPlayer} />
+              )}
             </div>
-
             {/* Generate Teams Section */}
-            {players.length >= 10 && (
+            {!finalized && players.length >= 10 && (
               <div className="bg-gray-800 rounded-lg p-6 shadow-xl">
                 <h2 className="text-2xl font-semibold text-lol-gold mb-4 flex items-center">
-                  <Shuffle className="mr-2" size={24} />
                   Generate Teams
                 </h2>
                 <div className="flex items-center space-x-4 mb-4">
@@ -242,36 +325,53 @@ function App() {
                   onClick={generateTeams}
                   className="bg-lol-gold hover:bg-yellow-600 text-lol-blue font-semibold px-6 py-3 rounded-md flex items-center space-x-2 transition-colors"
                 >
-                  <Shuffle size={20} />
                   <span>Generate Fair Teams</span>
                 </button>
               </div>
             )}
           </div>
         )}
-
         {/* Teams Tab */}
         {activeTab === 'teams' && (
           <div className="space-y-8">
             <div className="bg-gray-800 rounded-lg p-6 shadow-xl">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-semibold text-lol-gold flex items-center">
-                  <Trophy className="mr-2" size={24} />
                   Generated Teams
                 </h2>
-                {teams.length > 0 && (
+                {finalized && (
+                  <div className="text-sm text-green-400">Finalized by {finalized.finalizedBy} at {finalized.finalizedAt && new Date(finalized.finalizedAt).toLocaleString()}</div>
+                )}
+                {!finalized && teams.length > 0 && (
                   <button
-                    onClick={generateTeams}
-                    className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md flex items-center space-x-2 transition-colors"
+                    onClick={handleFinalizeTeams}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md flex items-center space-x-2 transition-colors"
                   >
-                    <Shuffle size={16} />
-                    <span>Regenerate</span>
+                    <span>Finalize Teams</span>
+                  </button>
+                )}
+                {finalized && (
+                  <button
+                    onClick={handleResetFinalized}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md flex items-center space-x-2 transition-colors ml-4"
+                  >
+                    <span>Reset Teams</span>
                   </button>
                 )}
               </div>
-              <TeamDisplay teams={teams} />
+              <TeamDisplay teams={finalized ? finalized.teams : teams} />
+              {finalized && (
+                <div className="text-yellow-400 mt-4">Teams are finalized and locked. Click Reset Teams to allow new team generation.</div>
+              )}
             </div>
           </div>
+        )}
+        {editPlayer && (
+          <EditPlayerModal
+            player={editPlayer}
+            onSave={handleSaveEdit}
+            onClose={() => setEditPlayer(null)}
+          />
         )}
       </div>
     </div>
