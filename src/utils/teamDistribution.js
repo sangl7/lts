@@ -28,6 +28,16 @@ export function calculateTeamSkill(team) {
   }, 0);
 }
 
+// Helper: shuffle array using Fisher-Yates algorithm
+function shuffleArray(array) {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 // Helper: count eligible players for each position
 function countEligiblePlayers(players) {
   const counts = { top: 0, jungle: 0, mid: 0, adc: 0, support: 0 };
@@ -48,9 +58,9 @@ function generateTeamCombinations(players, teamsCount) {
     throw new Error(`Need at least ${totalPlayers} players for ${teamsCount} teams`);
   }
 
-  // For now, we'll use a greedy approach for better performance
-  // In a production app, you might want to use more sophisticated algorithms
-  return greedyTeamGeneration(players.slice(0, totalPlayers), teamsCount);
+  // Shuffle players before selecting to add randomization
+  const shuffledPlayers = shuffleArray(players);
+  return greedyTeamGeneration(shuffledPlayers.slice(0, totalPlayers), teamsCount);
 }
 
 // Improved greedy algorithm: assign rarest positions first
@@ -71,11 +81,18 @@ function greedyTeamGeneration(players, teamsCount) {
   const teamNeeds = Array(teamsCount).fill().map(() => [...positionRarity]);
 
   // Copy players and sort by flexibility (players with fewer preferences first), then by skill
+  // Add some randomization by shuffling players with the same flexibility and skill level
   const sortedPlayers = [...players].sort((a, b) => {
     const flexA = (a.preferredPositions || []).length;
     const flexB = (b.preferredPositions || []).length;
     if (flexA !== flexB) return flexA - flexB;
-    return TIERS[b.tier] - TIERS[a.tier];
+    
+    const skillA = TIERS[a.tier];
+    const skillB = TIERS[b.tier];
+    if (skillA !== skillB) return skillB - skillA;
+    
+    // Add randomization for players with same flexibility and skill
+    return Math.random() - 0.5;
   });
 
   // Assign players to teams/positions
@@ -83,6 +100,9 @@ function greedyTeamGeneration(players, teamsCount) {
     let bestTeam = -1;
     let bestPosition = null;
     let bestScore = -Infinity;
+    
+    // Add some randomization to team selection when scores are close
+    const candidateAssignments = [];
 
     // Try each team and their unfilled positions (in rarity order)
     for (let teamIndex = 0; teamIndex < teamsCount; teamIndex++) {
@@ -96,6 +116,13 @@ function greedyTeamGeneration(players, teamsCount) {
         const currentTeamSkill = calculateTeamSkill(teams[teamIndex]);
         const balanceScore = 100 - currentTeamSkill;
         const totalScore = positionScore + balanceScore * 0.1;
+        
+        candidateAssignments.push({
+          teamIndex,
+          position,
+          score: totalScore
+        });
+        
         if (totalScore > bestScore) {
           bestScore = totalScore;
           bestTeam = teamIndex;
@@ -103,6 +130,17 @@ function greedyTeamGeneration(players, teamsCount) {
         }
       }
     }
+    
+    // If there are multiple assignments with similar scores (within 10% of best), randomly pick one
+    const threshold = bestScore * 0.9;
+    const goodAssignments = candidateAssignments.filter(a => a.score >= threshold);
+    
+    if (goodAssignments.length > 1) {
+      const randomChoice = goodAssignments[Math.floor(Math.random() * goodAssignments.length)];
+      bestTeam = randomChoice.teamIndex;
+      bestPosition = randomChoice.position;
+    }
+    
     // Assign player to best team and position
     if (bestTeam !== -1 && bestPosition) {
       const playerWithPosition = { ...player, assignedPosition: bestPosition };
